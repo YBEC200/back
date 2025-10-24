@@ -16,15 +16,6 @@ DB_CONFIG = {
     "port": int(os.getenv("DB_PORT", "3306")),
 }
 
-def serialize_row(row):
-    if not row:
-        return None
-    # Convertir datetime a string ISO para JSON
-    ts = row.get("fecha_publicacion")
-    if isinstance(ts, (datetime.date, datetime.datetime)):
-        row["fecha_publicacion"] = ts.isoformat(sep=' ')
-    return row
-
 def insert_message_to_db(texto):
     try:
         conn = mysql.connector.connect(**DB_CONFIG)
@@ -32,15 +23,13 @@ def insert_message_to_db(texto):
         # Cambia el nombre de la tabla/columna si es distinto
         cur.execute("INSERT INTO mensajes (mensaje) VALUES (%s)", (texto,))
         conn.commit()
-        last_id = cur.lastrowid
-        cur.execute("SELECT id, mensaje, fecha_publicacion FROM mensajes WHERE id = %s", (last_id,))
-        row = cur.fetchone()
         cur.close()
         conn.close()
-        return serialize_row(row)
+        return True
     except Exception as e:
+        # Log sencillo; en producción usar logger
         print("DB insert error:", e)
-        return None
+        return False
 
 @app.route("/", methods=[ "POST"])
 def hola_mundo():
@@ -73,23 +62,27 @@ def hola_mundo():
 
     return ".."
 
+# ...existing code...
+
 @app.route("/messages", methods=["GET"])
 def get_messages():
     try:
         conn = mysql.connector.connect(**DB_CONFIG)
-        cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT id, mensaje, fecha_publicacion FROM mensajes ORDER BY fecha_publicacion DESC")
-        rows = cur.fetchall()
+        cur = conn.cursor(dictionary=True)  # Usar dictionary=True para obtener resultados como diccionarios
+        
+        # Consulta SQL para obtener mensajes ordenados por fecha descendente
+        cur.execute("SELECT mensaje, fecha_publicacion FROM mensajes ORDER BY fecha_publicacion DESC")
+        
+        messages = cur.fetchall()
         cur.close()
         conn.close()
-        # Serializar timestamps
-        rows = [serialize_row(r) for r in rows]
-        return jsonify(rows), 200
+        
+        return jsonify(messages), 200
+        
     except Exception as e:
-        print("DB fetch error:", e)
-        return jsonify({"error": "db_error"}), 500
+        print("Error fetching messages:", e)
+        return jsonify({"error": "Database error"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
-# ...existing code...
 #  mysql-ybec.alwaysdata.net
