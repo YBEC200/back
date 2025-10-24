@@ -1,12 +1,39 @@
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from flask_cors import CORS
+import mysql.connector
+import os
+import pusher
+
 app = Flask(__name__)
 CORS(app)
 
+# Configuración de la base de datos (ajusta aquí o mediante variables de entorno)
+DB_CONFIG = {
+    "host": os.getenv("DB_HOST", "mysql-ybec.alwaysdata.net"),
+    "user": os.getenv("DB_USER", "ybec"),
+    "password": os.getenv("DB_PASS", "8B5EED1D"),
+    "database": os.getenv("DB_NAME", "ybec_inventario"),
+    "port": int(os.getenv("DB_PORT", "3306")),
+}
+
+def insert_message_to_db(texto):
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        cur = conn.cursor()
+        # Cambia el nombre de la tabla/columna si es distinto
+        cur.execute("INSERT INTO mensaje (texto) VALUES (%s)", (texto,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return True
+    except Exception as e:
+        # Log sencillo; en producción usar logger
+        print("DB insert error:", e)
+        return False
 
 @app.route("/", methods=[ "POST"])
 def hola_mundo():
-    import pusher
+    
     data = request.get_json()
    
     pusher_client = pusher.Pusher(
@@ -23,7 +50,19 @@ def hola_mundo():
         message = request.form.get("message") or request.get_data(as_text=True) or ""
 
     pusher_client.trigger('my-channel', 'my-event', message)
+
+    #guardar en base de datos
+
+    success = insert_message_to_db(message)
+
+    if success:
+        return jsonify({"status": "ok"}), 200
+    else:
+        return jsonify({"status": "db_error"}), 500
+
     return ".."
 
 if __name__ == "__main__":
     app.run(debug=True)
+# ...existing code...
+#  mysql-ybec.alwaysdata.net
