@@ -7,72 +7,62 @@ import pusher
 app = Flask(__name__)
 CORS(app)
 
-# Configuración de Pusher (movida fuera de la ruta para mejor rendimiento)
-pusher_client = pusher.Pusher(
-    app_id = '2062322',
-    key = "c87165fe436b0a5d5ba0",
-    secret = "76dc3c495d2f2c5eaf43",
-    cluster = "mt1",
-    ssl=True
-)
-
-# Corrección de la configuración de la base de datos
+# Configuración de la base de datos (ajusta aquí o mediante variables de entorno)
 DB_CONFIG = {
-    "host": "mysql-ybec.alwaysdata.net",
-    "user": "ybec",
-    "password": "8B5EED1D",
-    "database": "ybec_inventario"
+    "host": os.getenv("DB_HOST", "mysql-ybec.alwaysdata.net"),
+    "user": os.getenv("DB_USER", "ybec"),
+    "password": os.getenv("DB_PASS", "8B5EED1D"),
+    "database": os.getenv("DB_NAME", "ybec_inventario"),
+    "port": int(os.getenv("DB_PORT", "3306")),
 }
 
 def insert_message_to_db(texto):
     try:
         conn = mysql.connector.connect(**DB_CONFIG)
         cur = conn.cursor()
-        # Asegúrate que la tabla 'mensajes' existe con la columna 'mensaje'
+        # Cambia el nombre de la tabla/columna si es distinto
         cur.execute("INSERT INTO mensajes (mensaje) VALUES (%s)", (texto,))
         conn.commit()
         cur.close()
         conn.close()
         return True
     except Exception as e:
-        print("DB insert error:", str(e))
+        # Log sencillo; en producción usar logger
+        print("DB insert error:", e)
         return False
 
-@app.route("/", methods=["POST"])
+@app.route("/", methods=[ "POST"])
 def hola_mundo():
-    try:
-        data = request.get_json(force=True, silent=True)
-        print("Received payload:", data)
-        
-        if data and "message" in data:
-            message = data["message"]
-        else:
-            resp = {"status": "error", "message": "No message provided"}
-            print("Response:", resp)
-            return jsonify(resp), 400
+    
+    data = request.get_json()
+   
+    pusher_client = pusher.Pusher(
+        app_id = '2062322',
+        key = "c87165fe436b0a5d5ba0",
+        secret = "76dc3c495d2f2c5eaf43",
+        cluster = "mt1",
+        ssl=True
+    )
 
-        # Emitir mensaje a Pusher como objeto
-        try:
-            pusher_client.trigger('my-channel', 'my-event', {"message": message})
-        except Exception as e:
-            print("Pusher error:", e)
+    if data and "message" in data:
+        message = data["message"]
+    else:
+        message = request.form.get("message") or request.get_data(as_text=True) or ""
 
-        # Guardar en base de datos
-        success = insert_message_to_db(message)
+    pusher_client.trigger('my-channel', 'my-event', message)
 
-        if success:
-            resp = {"status": "ok", "message": "Guardado correctamente"}
-            print("Response:", resp)
-            return jsonify(resp), 200
-        else:
-            resp = {"status": "db_error", "message": "Error al guardar en DB"}
-            print("Response:", resp)
-            return jsonify(resp), 500
+    #guardar en base de datos
 
-    except Exception as e:
-        resp = {"status": "error", "message": str(e)}
-        print("Unhandled error:", e)
-        return jsonify(resp), 500
+    success = insert_message_to_db(message)
+
+    if success:
+        return jsonify({"status": "ok"}), 200
+    else:
+        return jsonify({"status": "db_error"}), 500
+
+    return ".."
 
 if __name__ == "__main__":
     app.run(debug=True)
+# ...existing code...
+#  mysql-ybec.alwaysdata.net
