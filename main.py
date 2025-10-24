@@ -21,7 +21,7 @@ def insert_message_to_db(texto):
         conn = mysql.connector.connect(**DB_CONFIG)
         cur = conn.cursor()
         # Cambia el nombre de la tabla/columna si es distinto
-        cur.execute("INSERT INTO mensaje (texto) VALUES (%s)", (texto,))
+        cur.execute("INSERT INTO mensajes (mensaje) VALUES (%s)", (texto,))
         conn.commit()
         cur.close()
         conn.close()
