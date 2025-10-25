@@ -49,7 +49,7 @@ def hola_mundo():
     else:
         message = request.form.get("message") or request.get_data(as_text=True) or ""
 
-    pusher_client.trigger('my-channel', 'my-event', message)
+    pusher_client.trigger(data['channel'], 'my-event', message)
 
     #guardar en base de datos
 
