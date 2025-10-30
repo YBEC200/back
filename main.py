@@ -44,12 +44,16 @@ def hola_mundo():
         ssl=True
     )
 
-    if data and "message" in data:
-        message = data["message"]
-    else:
-        message = request.form.get("message") or request.get_data(as_text=True) or ""
+    # Extrae mensaje y canal del request
+    message = data.get("message")
+    channel = data.get("channel", "my-channel")  # default si no viene
+    sender_id = data.get("senderId")
 
-    pusher_client.trigger(data['channel'], 'my-event', message)
+    # Trigger con formato consistente
+    pusher_client.trigger(channel, 'my-event', {
+        'message': message,
+        'senderId': sender_id
+    })
 
     #guardar en base de datos
 
